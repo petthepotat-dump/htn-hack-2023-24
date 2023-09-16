@@ -108,10 +108,7 @@ def main():
         # run the opencv code
         while True:
             # read frame from camera
-            ret, frame = cap.read()
-
-            # read frame from camera
-            frame_box = cap.read()
+            ret, frame_box = cap.read()
 
             # check if frame is read correctly
             if not ret:
@@ -145,7 +142,6 @@ def main():
                     cv2.polylines(frame_box, [approx], True, (0, 255, 0), 2)
 
             # show frame
-            cv2.imshow('frame', frame)
             cv2.imshow('frame', frame_box)
 
 
