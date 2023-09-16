@@ -176,7 +176,7 @@ def main():
                 botleft = min(coords[:2], key=lambda x: x[1])
                 topright = max(coords[2:], key=lambda x: x[1])
                 botright = min(coords[2:], key=lambda x: x[1])
-                # print(topleft, botleft, topright, botright, coords)
+                print(topleft, botleft, topright, botright, coords)
 
                 # cv2.line(result, coords[0], coords[1], (0, 0, 255), 2) # top line
                 # cv2.line(result, coords[2], coords[3], (0, 0, 255), 2) # bot line
@@ -186,12 +186,16 @@ def main():
                 cv2.line(result, topright, botright, (0, 0, 255), 2)
                 cv2.line(result, topleft, topright, (0, 0, 255), 2)
                 cv2.line(result, botleft, botright, (0, 0, 255), 2)
+
                 # diagonal line
                 cv2.line(result, botleft, topright, (0, 255, 0), 2)
                 d_length = np.sqrt((botleft[0] - topright[0])**2 + (botleft[1] - topright[1])**2) # pixels
                 scale_factor = COMPUTER_CSECTION / d_length # meters/pixels
 
-                print(scale_factor)
+                # print(scale_factor)
+            else:
+                # you are outside of the screen //  not focused ons creen
+                print("you are not focused on the window")
 
             # show frame
             # cv2.imshow('frame', frame)
