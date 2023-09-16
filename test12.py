@@ -68,7 +68,7 @@ def main():
     global xvec, yvec  # Declare these as global
     frontend = FrontendData()
     # create an opencv camera instance
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(2)
 
     # check if camera is opened
     if not cap.isOpened():
