@@ -3,6 +3,40 @@ import adhawkapi
 import adhawkapi.frontend
 import numpy as np
 import cv2
+import threading
+
+import sys
+from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPainter, QBrush, QColor
+
+
+
+# get monitor res
+from screeninfo import get_monitors
+
+
+class SmallWindow(QWidget):
+    def __init__(self, title, x, y, w = 40, h = 40):
+        super().__init__()
+
+        # Set window title and position
+        self.setWindowTitle(title)
+        self.setGeometry(x, y, w, h)  # x, y, width, height
+
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setStyleSheet("background-color: rgba(255, 0, 255, 255);")
+
+    def keyPressEvent(self, event):
+        # check if escape key
+        if event.key() == Qt.Key.Key_Escape:
+            QApplication.instance().quit()  # Close the application
+
+
+
+# --------------------------------------------------
+
+
 
 frame = None  # Declare global frame to be accessed in multiple functions
 xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
@@ -175,4 +209,24 @@ def main():
         print(e)
 
 if __name__ == '__main__':
+    wmain = get_monitors()[0]
+    app = QApplication(sys.argv)
+    
+    # Create 4 small windows with different titles and positions
+    window1 = SmallWindow("Window 1", 0, 0)
+    window2 = SmallWindow("Window 2", 0, wmain.height-40)
+    window3 = SmallWindow("Window 3", wmain.width - 40, 0)
+    window4 = SmallWindow("Window 4", wmain.width - 40, wmain.height - 40)
+
+    # Show all the windows
+    window1.show()
+    window2.show()
+    window3.show()
+    window4.show()
+
+    thread = threading.Thread(target=app.exec)
+    thread.start()
     main()
+
+    thread.join()
+    
