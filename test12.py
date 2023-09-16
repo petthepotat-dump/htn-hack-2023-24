@@ -10,6 +10,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QWidget
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPainter, QBrush, QColor
+import pyautogui
 
 
 
@@ -45,7 +46,7 @@ xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default value
 
 
 # convert 15 inch to meters
-CSECTION = 14
+CSECTION = 13
 # 1 inch = 0.0254 meters
 COMPUTER_CSECTION = 0.0254 * CSECTION
 
@@ -77,7 +78,7 @@ class FrontendData:
     def _handle_events(event_type, timestamp, *args):
         if event_type == adhawkapi.Events.BLINK:
             duration = args[0]
-            print(f'Got blink: {timestamp} {duration}')
+            #print(f'Got blink: {timestamp} {duration}')
 
     def _handle_tracker_connect(self):
         print("Tracker connected")
@@ -142,10 +143,7 @@ def main():
             xc = (clamp(-3, 3, xvec) + 3) / 6 * w
             x_point = int(clamp(-10000, 10000, xc + (75 + xc/80)))
             y_point = h - int((clamp(-2, 2, yvec) + 2) / 4 * h)
-            if COUNTER % 10 == 0: print(h, w, x_point, y_point)
-
-            # Draw a circle on the gaze point
-            cv2.circle(frame, (x_point, y_point), 5, (0, 0, 255), -1)
+            #if COUNTER % 10 == 0: print(h, w, x_point, y_point)
 
             # -- 
             # get hsv image
@@ -153,7 +151,7 @@ def main():
             # filter out colours within a range
             mask = cv2.inRange(hsv, HSV_RANGE[0], HSV_RANGE[1])
             result = cv2.bitwise_and(frame, frame, mask=mask)
-            # convert result to black and white
+            # # convert result to black and white
             resultbw = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
 
@@ -182,10 +180,20 @@ def main():
                 # cv2.line(result, coords[2], coords[3], (0, 0, 255), 2) # bot line
                 # cv2.line(result, coords[0], coords[2], (0, 0, 255), 2) # left line
                 # cv2.line(result, coords[1], coords[3], (0, 0, 255), 2) # right line
-                cv2.line(result, topleft, botleft, (0, 0, 255), 2)
-                cv2.line(result, topright, botright, (0, 0, 255), 2)
-                cv2.line(result, topleft, topright, (0, 0, 255), 2)
-                cv2.line(result, botleft, botright, (0, 0, 255), 2)
+                cv2.line(frame, topleft, botleft, (0, 0, 255), 2)
+                cv2.line(frame, topright, botright, (0, 0, 255), 2)
+                cv2.line(frame, topleft, topright, (0, 0, 255), 2)
+                cv2.line(frame, botleft, botright, (0, 0, 255), 2)
+                #---------
+            
+                # krish stuff -- keep commented for now
+                # cv2.line(frame, topleft, botleft, (0, 0, 255), 2)
+                # cv2.line(frame, topright, botright, (0, 0, 255), 2)
+                # cv2.line(frame, topleft, topright, (0, 0, 255), 2)
+                # cv2.line(frame, botleft, botright, (0, 0, 255), 2)
+                # cv2.line(frame, botleft, topright, (0, 255, 0), 2)
+
+                cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
 
                 # diagonal line
                 cv2.line(result, botleft, topright, (0, 255, 0), 2)
@@ -201,7 +209,12 @@ def main():
             # cv2.imshow('frame', frame)
             # cv2.imshow('hsv', hsv)
             # cv2.imshow('mask', mask)
-            cv2.imshow('result', result)
+
+            # Draw a circle on the gaze point
+            cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
+            # cv2.imshow('result', result)
+            cv2.imshow('frame', frame)
+
 
             # wait for key press
             if cv2.waitKey(1) == ord('q'):
