@@ -86,8 +86,11 @@ class FrontendData:
                     i_IMU = (x, y, z, w)
                 c_IMU = (i_IMU[0] - x, i_IMU[1] - y, i_IMU[2] - z, i_IMU[3] - w)
                 # print(f'IMU: x={x:.2f},y={y:.2f},z={z:.2f},w={w:.2f}')
-                print(f"IMU: {c_IMU[0]:.2f},{c_IMU[1]:.2f},{c_IMU[2]:.2f},{c_IMU[3]:.2f}")
-        print('-' * 30)
+                # print(f"IMU: {c_IMU[0]:.2f},{c_IMU[1]:.2f},{c_IMU[2]:.2f},{c_IMU[3]:.2f}")
+        if et_data.gaze_in_image is not None:
+            x, y = et_data.gaze_in_image
+            # print(f'Gaze in image: x={x:.2f},y={y:.2f}')
+        # print('-' * 30)
 
 
     @staticmethod
@@ -188,7 +191,7 @@ def main():
                 CACHE_COORDS[2] = max(coords[2:], key=lambda x: x[1]) #topright
                 CACHE_COORDS[3] = min(coords[2:], key=lambda x: x[1]) #botright
 
-                print(CACHE_COORDS)
+                # print(CACHE_COORDS)
 
                 #---------
             
@@ -199,7 +202,7 @@ def main():
                 # cv2.line(frame, botleft, botright, (0, 0, 255), 2)
                 # cv2.line(frame, botleft, topright, (0, 255, 0), 2)
 
-                cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
+                # cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
 
                 # diagonal line
                 cv2.line(result, CACHE_COORDS[1], CACHE_COORDS[2], (0, 255, 0), 2)
@@ -212,34 +215,52 @@ def main():
                 # find the 'center' of the image (average center lol)
                 ccd = (CACHE_COORDS[0][0] + CACHE_COORDS[3][0]) / 2, (CACHE_COORDS[0][1] + CACHE_COORDS[3][1]) / 2 # center of computer display
                 
+                # find camera offset
+                coff = [0, 0, 0]
+
+                
+                
                 # convert quat -> axis angle -> rodrigues angle -> 3x3 rot matrix -> 4x4 rot matrix
-                # rmat = np.ndarray([
-                #     [1 - 2 * yvec*yvec - 2 * zvec*zvec, 2 * xvec *yvec-2*zvec*wvec, 2*xvec*zvec+2*yvec*wvec],
-                #     [2*xvec*yvec+2*zvec*wvec, 1-2*xvec*xvec-2*zvec*zvec, 2*yvec*zvec-2*xvec*wvec],
-                #     [2*xvec*zvec-2*yvec*wvec, 2*yvec*zvec+2*xvec*wvec, 1-2*xvec*xvec-2*yvec*yvec]
+                rmat = np.array([
+                    [1 - 2 * yvec*yvec - 2 * zvec*zvec, 2 * xvec *yvec-2*zvec*wvec, 2*xvec*zvec+2*yvec*wvec],
+                    [2*xvec*yvec+2*zvec*wvec, 1-2*xvec*xvec-2*zvec*zvec, 2*yvec*zvec-2*xvec*wvec],
+                    [2*xvec*zvec-2*yvec*wvec, 2*yvec*zvec+2*xvec*wvec, 1-2*xvec*xvec-2*yvec*yvec]
+                ])
+                # mat1 = np.array([
+                #     [wvec, zvec, -yvec, xvec],
+                #     [-zvec, wvec, xvec, yvec],
+                #     [yvec, -xvec, wvec, zvec],
+                #     [-xvec, -yvec, -zvec, wvec]
                 # ])
-                mat1 = np.array([
-                    [wvec, zvec, -yvec, xvec],
-                    [-zvec, wvec, xvec, yvec],
-                    [yvec, -xvec, wvec, zvec],
-                    [-xvec, -yvec, -zvec, wvec]
-                ])
-                mat2 = np.array([
-                    [wvec, zvec, -yvec, -xvec],
-                    [-zvec, wvec, xvec, -yvec],
-                    [yvec, -xvec, wvec, -zvec],
-                    [xvec, yvec, zvec, wvec]
-                ])
-                rmat = np.matmul(mat1, mat2)
+                # mat2 = np.array([
+                #     [wvec, zvec, -yvec, -xvec],
+                #     [-zvec, wvec, xvec, -yvec],
+                #     [yvec, -xvec, wvec, -zvec],
+                #     [xvec, yvec, zvec, wvec]
+                # ])
+                # rmat = np.matmul(mat1, mat2)
                 # print(rmat)
+                mat3x3 = np.array([
+                    [16, 0, 0],
+                    [0, 9, 0],
+                    [0, 0, 1]
+                ])
+
+                # find the final equation 
+                """We're missing the scale factor that goes on the left side"""
+                
+                _f = np.matmul(mat3x3, rmat)
+                end_pos: (float, float, float) = np.matmul(_f, np.array([xvec, yvec, zvec]))
+                end_pos = [end_pos[0] / end_pos[2], end_pos[1] / end_pos[2]]
 
                 # now we do some math
-
+                print(end_pos)
+                cv2.circle(frame, (int(end_pos[0]), int(end_pos[1])), 5, (0, 255, 0), -1)
 
                 # print(scale_factor)
             else:
                 # you are outside of the screen //  not focused ons creen
-                print("you are not focused on the window")
+                # print("you are not focused on the window")
                 pass
 
             # draw the rectnagle
@@ -259,7 +280,7 @@ def main():
             # cv2.imshow('mask', mask)
 
             # Draw a circle on the gaze point
-            cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
+            # cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
             # cv2.imshow('result', result)
             cv2.imshow('frame', frame)
 
