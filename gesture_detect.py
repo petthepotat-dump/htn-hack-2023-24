@@ -141,9 +141,9 @@ while True:
                     print(f"{hand_type.capitalize()} Hand: Two Finger Scroll")
                     hand_state[hand_type] = "two_finger_scroll"
                     if hand_type == 'right':
-                        pyautogui.scroll(100)
+                        pyautogui.scroll(10)
                     elif hand_type == 'left':
-                        pyautogui.scroll(-100)
+                        pyautogui.scroll(-10)
 
             elif is_closed_fist(hand_landmarks):
                 if hand_state[hand_type] != "closed_fist":
