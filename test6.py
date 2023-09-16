@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 
 # Initialize Roboflow
-rf = Roboflow(api_key="x")
+rf = Roboflow(api_key="vWhscCBeLxNi4A38zyTf")
 project = rf.workspace().project("screen-detector-v")
 model = project.version(1).model
 
@@ -93,18 +93,20 @@ def main():
             break
 
         # Predict on the current frame
-        predictions = model.predict_from_image(frame, confidence=40, overlap=30)
+        predictions = model.predict(frame, confidence=40, overlap=30)
+        model.predict(frame, confidence=40, overlap=30).json()
 
         # Draw bounding boxes on the frame based on predictions
         for prediction in predictions:
-            label = prediction['label']
             confidence = prediction['confidence']
-            x, y, w, h = prediction['xmin'], prediction['ymin'], prediction['width'], prediction['height']
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, f"{label}: {confidence:.2f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            x, y, w, h = prediction['x'], prediction['y'], prediction['width'], prediction['height']
+            print(x, y, w, h)
+            line1 = cv2.line(frame, (x,y), (x+w,y), (255, 0, 0), 2) 
+            # image = cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
 
         # Show the frame with bounding boxes
-        cv2.imshow('Object Detection', frame)
+        cv2.imshow('Object Detection', line1)
 
         # Check for user input to exit the loop
         key = cv2.waitKey(1)
