@@ -12,11 +12,15 @@ def is_closed_fist(hand_landmarks):
         return True
     return False
 
+def is_finger_extended(finger_tip, finger_dip, finger_mcp):
+    return finger_tip.y < finger_dip.y and finger_dip.y < finger_mcp.y
+
+
 def scroll_up():
-    pyautogui.scroll(1)
+    pyautogui.scroll(80)
 
 def scroll_down():
-    pyautogui.scroll(-1)
+    pyautogui.scroll(-80)
 
 def minecraft_left_click():
     pyautogui.mouseDown(button='left')
@@ -32,13 +36,45 @@ def minecraft_right_release():
 
 def is_two_finger_scroll(hand_landmarks):
     index_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+    index_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_DIP]
+    index_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
+    
     middle_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+    middle_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_DIP]
+    middle_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
     
-    # Check if index and middle finger are extended and others are folded
-    # You might also want to check y-coordinates to decide scroll direction
-    # Here we just return True for demonstration
+    ring_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_TIP]
+    ring_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_DIP]
+    ring_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_MCP]
+
+    pinky_tip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP]
+    pinky_dip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_DIP]
+    pinky_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_MCP]
     
-    return True
+    is_index_extended = is_finger_extended(index_finger_tip, index_finger_dip, index_finger_mcp)
+    is_middle_extended = is_finger_extended(middle_finger_tip, middle_finger_dip, middle_finger_mcp)
+    
+    is_ring_extended = is_finger_extended(ring_finger_tip, ring_finger_dip, ring_finger_mcp)
+    is_pinky_extended = is_finger_extended(pinky_tip, pinky_dip, pinky_mcp)
+
+    if is_index_extended and is_middle_extended and not is_ring_extended and not is_pinky_extended:
+        return True
+    return False
+    index_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+    index_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_DIP]
+    index_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
+    
+    middle_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+    middle_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_DIP]
+    middle_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+    
+    is_index_extended = is_finger_extended(index_finger_tip, index_finger_dip, index_finger_mcp)
+    is_middle_extended = is_finger_extended(middle_finger_tip, middle_finger_dip, middle_finger_mcp)
+    
+    if is_index_extended and is_middle_extended:
+        return True
+    return False
+
 def is_zoom_gesture(hand_landmarks):
     thumb_tip = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
     index_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
@@ -48,19 +84,45 @@ def is_zoom_gesture(hand_landmarks):
     # You can decide on a threshold distance for zoom action here
     return True if distance > SOME_THRESHOLD else False
 
-def is_thumb_up(hand_landmarks):
-    # Similar to is_closed_fist, but for thumb up gesture
-    return True if CONDITION else False
-def is_rock_sign(hand_landmarks):
-    # Logic to detect rock sign based on landmark positions
-    return True if CONDITION else False
+# def is_thumb_up(hand_landmarks):
+#     # Similar to is_closed_fist, but for thumb up gesture
+#     return True if CONDITION else False
+# def is_rock_sign(hand_landmarks):
+#     # Logic to detect rock sign based on landmark positions
+#     return True if CONDITION else False
+
+def is_open_fist(hand_landmarks):
+    index_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+    index_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_DIP]
+    index_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
+    
+    middle_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+    middle_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_DIP]
+    middle_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+    
+    ring_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_TIP]
+    ring_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_DIP]
+    ring_finger_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_MCP]
+    
+    pinky_tip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP]
+    pinky_dip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_DIP]
+    pinky_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_MCP]
+
+    is_index_extended = is_finger_extended(index_finger_tip, index_finger_dip, index_finger_mcp)
+    is_middle_extended = is_finger_extended(middle_finger_tip, middle_finger_dip, middle_finger_mcp)
+    is_ring_extended = is_finger_extended(ring_finger_tip, ring_finger_dip, ring_finger_mcp)
+    is_pinky_extended = is_finger_extended(pinky_tip, pinky_dip, pinky_mcp)
+
+    if is_index_extended and is_middle_extended and is_ring_extended and is_pinky_extended:
+        return True
+    return False
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
 cap = cv2.VideoCapture(0)
 hands = mp_hands.Hands()
 
-hand_state = "open"
+hand_state = {"left": "unknown", "right": "unknown"}
 
 while True:
     ret, frame = cap.read()
@@ -68,39 +130,34 @@ while True:
     results = hands.process(rgb_frame)
 
     if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
+        for hand_num, hand_landmarks in enumerate(results.multi_hand_landmarks):
+            hand_type = results.multi_handedness[hand_num].classification[0].label.lower()  # Get the type of the hand ("Left" or "Right")
+            
             mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+            
+            if is_two_finger_scroll(hand_landmarks):
+                if hand_state[hand_type] != "two_finger_scroll":
+                    print(f"{hand_type.capitalize()} Hand: Two Finger Scroll")
+                    hand_state[hand_type] = "two_finger_scroll"
+                    if hand_type == "right":
+                        scroll_up()
+                    elif hand_type == "left":
+                        scroll_down()
 
-            if is_closed_fist(hand_landmarks):
-                if hand_state != "closed":
-                    print("Closed Fist")
-                    hand_state = "closed"
-                    
-            elif is_two_finger_scroll(hand_landmarks):
-                if hand_state != "scroll":
-                    print("Two Finger Scroll")
-                    hand_state = "scroll"
-                    
-            elif is_zoom_gesture(hand_landmarks):
-                if hand_state != "zoom":
-                    print("Zoom Gesture")
-                    hand_state = "zoom"
-                    
-            elif is_thumb_up(hand_landmarks):
-                if hand_state != "thumb_up":
-                    print("Thumb Up")
-                    hand_state = "thumb_up"
-                    
-            elif is_rock_sign(hand_landmarks):
-                if hand_state != "rock":
-                    print("Rock Sign")
-                    hand_state = "rock"
-                    
+            elif is_closed_fist(hand_landmarks):
+                if hand_state[hand_type] != "closed_fist":
+                    print(f"{hand_type.capitalize()} Hand: Closed Fist")
+                    hand_state[hand_type] = "closed_fist"
+            
+            elif is_open_fist(hand_landmarks):
+                if hand_state[hand_type] != "open_fist":
+                    print(f"{hand_type.capitalize()} Hand: Open Fist")
+                    hand_state[hand_type] = "open_fist"
+
             else:
-                if hand_state != "open":
-                    print("Open Fist")
-                    hand_state = "open"
-
+                if hand_state[hand_type] != "unknown":
+                    print(f"{hand_type.capitalize()} Hand: Unknown Gesture")
+                    hand_state[hand_type] = "unknown"
             
     cv2.imshow('Hand Tracking', frame)
 
