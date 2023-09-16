@@ -122,7 +122,8 @@ mp_hands = mp.solutions.hands
 cap = cv2.VideoCapture(0)
 hands = mp_hands.Hands()
 
-hand_state = {"left": "unknown", "right": "unknown"}
+hand_state = {"left": {"state": "unknown", "is_holding": False},
+              "right": {"state": "unknown", "is_holding": False}}
 
 while True:
     ret, frame = cap.read()
@@ -130,35 +131,34 @@ while True:
     results = hands.process(rgb_frame)
 
     if results.multi_hand_landmarks:
-        for hand_num, hand_landmarks in enumerate(results.multi_hand_landmarks):
-            hand_type = results.multi_handedness[hand_num].classification[0].label.lower()  # Get the type of the hand ("Left" or "Right")
-            
-            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+        for hand_landmarks in results.multi_hand_landmarks:
+            hand_type = "right"  # You'll need to identify which hand this is. Left or Right.
             
             if is_two_finger_scroll(hand_landmarks):
-                if hand_state[hand_type] != "two_finger_scroll":
-                    print(f"{hand_type.capitalize()} Hand: Two Finger Scroll")
-                    hand_state[hand_type] = "two_finger_scroll"
-                    if hand_type == "right":
-                        scroll_up()
-                    elif hand_type == "left":
-                        scroll_down()
-
+                if hand_state[hand_type]['state'] != "two_finger_scroll":
+                    print("Two Finger Scroll")
+                    hand_state[hand_type]['state'] = "two_finger_scroll"
+                    scroll_up()
+                    if hand_state[hand_type]['is_holding']:
+                        minecraft_left_release()
+                        hand_state[hand_type]['is_holding'] = False
+            
             elif is_closed_fist(hand_landmarks):
-                if hand_state[hand_type] != "closed_fist":
-                    print(f"{hand_type.capitalize()} Hand: Closed Fist")
-                    hand_state[hand_type] = "closed_fist"
+                if hand_state[hand_type]['state'] != "closed_fist":
+                    print("Closed Fist")
+                    hand_state[hand_type]['state'] = "closed_fist"
+                    if not hand_state[hand_type]['is_holding']:
+                        minecraft_left_click()
+                        hand_state[hand_type]['is_holding'] = True
             
-            elif is_open_fist(hand_landmarks):
-                if hand_state[hand_type] != "open_fist":
-                    print(f"{hand_type.capitalize()} Hand: Open Fist")
-                    hand_state[hand_type] = "open_fist"
-
             else:
-                if hand_state[hand_type] != "unknown":
-                    print(f"{hand_type.capitalize()} Hand: Unknown Gesture")
-                    hand_state[hand_type] = "unknown"
-            
+                if hand_state[hand_type]['state'] != "unknown":
+                    print("Unknown Gesture or Open Fist")
+                    hand_state[hand_type]['state'] = "unknown"
+                    if hand_state[hand_type]['is_holding']:
+                        minecraft_left_release()
+                        hand_state[hand_type]['is_holding'] = False
+                        
     cv2.imshow('Hand Tracking', frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
