@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import pyautogui
 
+
 def is_closed_fist(hand_landmarks):
     # Assume the landmarks have attributes x, y
     tip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x
@@ -9,9 +10,9 @@ def is_closed_fist(hand_landmarks):
     
     # Add more conditions
     if tip_x < pip_x:
-        return True
-    return False
-
+        return False
+    return True
+    
 def is_finger_extended(finger_tip, finger_dip, finger_mcp):
     return finger_tip.y < finger_dip.y and finger_dip.y < finger_mcp.y
 
@@ -122,43 +123,42 @@ mp_hands = mp.solutions.hands
 cap = cv2.VideoCapture(0)
 hands = mp_hands.Hands()
 
-hand_state = {"left": {"state": "unknown", "is_holding": False},
-              "right": {"state": "unknown", "is_holding": False}}
+hand_state = {'left': 'unknown', 'right': 'unknown'}
 
 while True:
     ret, frame = cap.read()
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(rgb_frame)
 
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-            hand_type = "right"  # You'll need to identify which hand this is. Left or Right.
+    if results.multi_hand_landmarks and results.multi_handedness:
+        for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
+            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
             
+            hand_type = 'left' if handedness.classification[0].label == 'Left' else 'right'
+
             if is_two_finger_scroll(hand_landmarks):
-                if hand_state[hand_type]['state'] != "two_finger_scroll":
-                    print("Two Finger Scroll")
-                    hand_state[hand_type]['state'] = "two_finger_scroll"
-                    scroll_up()
-                    if hand_state[hand_type]['is_holding']:
-                        minecraft_left_release()
-                        hand_state[hand_type]['is_holding'] = False
-            
+                if hand_state[hand_type] != "two_finger_scroll":
+                    print(f"{hand_type.capitalize()} Hand: Two Finger Scroll")
+                    hand_state[hand_type] = "two_finger_scroll"
+                    if hand_type == 'right':
+                        pyautogui.scroll(100)
+                    elif hand_type == 'left':
+                        pyautogui.scroll(-100)
+
             elif is_closed_fist(hand_landmarks):
-                if hand_state[hand_type]['state'] != "closed_fist":
-                    print("Closed Fist")
-                    hand_state[hand_type]['state'] = "closed_fist"
-                    if not hand_state[hand_type]['is_holding']:
-                        minecraft_left_click()
-                        hand_state[hand_type]['is_holding'] = True
+                if hand_state[hand_type] != "closed_fist":
+                    print(f"{hand_type.capitalize()} Hand: Closed Fist")
+                    hand_state[hand_type] = "closed_fist"
+                    if hand_type == 'right':
+                        pyautogui.mouseDown(button='left')
             
             else:
-                if hand_state[hand_type]['state'] != "unknown":
-                    print("Unknown Gesture or Open Fist")
-                    hand_state[hand_type]['state'] = "unknown"
-                    if hand_state[hand_type]['is_holding']:
-                        minecraft_left_release()
-                        hand_state[hand_type]['is_holding'] = False
-                        
+                if hand_state[hand_type] != "unknown":
+                    print(f"{hand_type.capitalize()} Hand: Unknown Gesture")
+                    hand_state[hand_type] = "unknown"
+                    if hand_type == 'right':
+                        pyautogui.mouseUp(button='left')
+            
     cv2.imshow('Hand Tracking', frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
