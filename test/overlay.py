@@ -22,11 +22,11 @@ class OverlayWidget(QWidget):
         print(main)
 
         # Set the window's flags to make it act as an overlay
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
+        # self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        # self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # self.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
 
-        self.rectangles = [(0, 0, 20, 20), (main.width - 20, main.width-100, 20, 20)]
+        self.rectangles = [(0, 0, 20, 20), (main.width - 20, 100, 20, 20)]
 
         painter = QPainter(self)
         painter.setBrush(QBrush(QColor(255, 0, 0)))  # Red color
