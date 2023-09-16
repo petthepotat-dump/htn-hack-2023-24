@@ -1,1 +1,3 @@
 adhawk-ble
+pyqt5
+
