@@ -41,7 +41,7 @@ class SmallWindow(QWidget):
 
 
 frame = None  # Declare global frame to be accessed in multiple functions
-xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
+xvec, yvec, zvec, wvec = 0.0, 0.0, 0.0, 0.0 # Initialize gaze vector components to some default values
 
 
 
@@ -50,7 +50,13 @@ CSECTION = 13
 # 1 inch = 0.0254 meters
 COMPUTER_CSECTION = 0.0254 * CSECTION
 
+# --------------------------------------------------
+
 COUNTER = 0
+i_IMU = None
+c_IMU = None
+CACHE_COORDS = [(0,0), (0,0), (0,0), (0,0)]
+
 
 class FrontendData:
     def __init__(self):
@@ -66,12 +72,22 @@ class FrontendData:
 
     @staticmethod
     def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
-        global COUNTER, xvec, yvec  # Declare these as global
+        # Declare these as global
+        global COUNTER, xvec, yvec, zvec, wvec, i_IMU
         COUNTER += 1
         if COUNTER % 10 != 0: return
         if et_data.gaze is not None:
-            xvec, yvec, zvec, vergence = et_data.gaze
-            # print(f'Gaze={xvec:.2f},y={yvec:.2f},z={zvec:.2f},vergence={vergence:.2f}')
+            xvec, yvec, zvec, wvec= et_data.gaze
+            print(f'Gaze={xvec:.2f},y={yvec:.2f},z={zvec:.2f},vergence={wvec:.2f}')
+        if et_data.imu_quaternion is not None:
+            if et_data.eye_mask == adhawkapi.EyeMask.BINOCULAR:
+                x, y, z, w = et_data.imu_quaternion
+                if not i_IMU:
+                    i_IMU = (x, y, z, w)
+                c_IMU = (i_IMU[0] - x, i_IMU[1] - y, i_IMU[2] - z, i_IMU[3] - w)
+                # print(f'IMU: x={x:.2f},y={y:.2f},z={z:.2f},w={w:.2f}')
+                print(f"IMU: {c_IMU[0]:.2f},{c_IMU[1]:.2f},{c_IMU[2]:.2f},{c_IMU[3]:.2f}")
+        print('-' * 30)
 
 
     @staticmethod
@@ -107,7 +123,6 @@ def clamp(_min, _max, val):
         return val
 
 
-
 # HSV_RANGE = [np.array((60, 0, 0)), np.array((85, 100, 100))] # green
 HSV_RANGE = [np.array((135, 100, 200)), np.array((155, 160, 255))] # magenta
 C_LIMIT = 10
@@ -115,7 +130,7 @@ C_LIMIT = 10
 
 def main():
     ''' App entrypoint '''
-    global xvec, yvec  # Declare these as global
+    global xvec, yvec, zvec, wvec, CACHE_COORDS # Declare these as global
     frontend = FrontendData()
     # create an opencv camera instance
     cap = cv2.VideoCapture(0)
@@ -139,6 +154,7 @@ def main():
             # Get dimensions
             h, w, c = frame.shape
 
+            #TODO: remoeve / fix this cringe
             # For demonstration: create a point from gaze vector
             xc = (clamp(-3, 3, xvec) + 3) / 6 * w
             x_point = int(clamp(-10000, 10000, xc + (75 + xc/80)))
@@ -154,7 +170,6 @@ def main():
             # # convert result to black and white
             resultbw = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
-
             coords = []
             # draw rectangles around each contour
             contours, hierarchy = cv2.findContours(resultbw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -164,26 +179,17 @@ def main():
                     coords.append((x, y))
                     cv2.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-
-
             # sort coords by x, then by y
             coords = sorted(coords, key=lambda x: (x[0]))
             # draw coords to result (lines)
-            if len(coords) >= 4:
-                topleft = max(coords[:2], key=lambda x: x[1])
-                botleft = min(coords[:2], key=lambda x: x[1])
-                topright = max(coords[2:], key=lambda x: x[1])
-                botright = min(coords[2:], key=lambda x: x[1])
-                print(topleft, botleft, topright, botright, coords)
+            if len(coords) >= 4 and COUNTER%3==0:
+                CACHE_COORDS[0] = max(coords[:2], key=lambda x: x[1]) #topleft
+                CACHE_COORDS[1] = min(coords[:2], key=lambda x: x[1]) #botleft
+                CACHE_COORDS[2] = max(coords[2:], key=lambda x: x[1]) #topright
+                CACHE_COORDS[3] = min(coords[2:], key=lambda x: x[1]) #botright
 
-                # cv2.line(result, coords[0], coords[1], (0, 0, 255), 2) # top line
-                # cv2.line(result, coords[2], coords[3], (0, 0, 255), 2) # bot line
-                # cv2.line(result, coords[0], coords[2], (0, 0, 255), 2) # left line
-                # cv2.line(result, coords[1], coords[3], (0, 0, 255), 2) # right line
-                cv2.line(frame, topleft, botleft, (0, 0, 255), 2)
-                cv2.line(frame, topright, botright, (0, 0, 255), 2)
-                cv2.line(frame, topleft, topright, (0, 0, 255), 2)
-                cv2.line(frame, botleft, botright, (0, 0, 255), 2)
+                print(CACHE_COORDS)
+
                 #---------
             
                 # krish stuff -- keep commented for now
@@ -196,14 +202,56 @@ def main():
                 cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
 
                 # diagonal line
-                cv2.line(result, botleft, topright, (0, 255, 0), 2)
-                d_length = np.sqrt((botleft[0] - topright[0])**2 + (botleft[1] - topright[1])**2) # pixels
-                scale_factor = COMPUTER_CSECTION / d_length # meters/pixels
+                cv2.line(result, CACHE_COORDS[1], CACHE_COORDS[2], (0, 255, 0), 2)
+                d_length = np.sqrt((CACHE_COORDS[1][0] - CACHE_COORDS[2][0])**2 + (CACHE_COORDS[1][1] - CACHE_COORDS[2][1])**2) # pixels
+                
+                # calculate focal length - m/pix
+                focal = COMPUTER_CSECTION / d_length
+                # homographic mapping (3d point -> 2d)
+                ngaze = np.linalg.norm(np.array([xvec, yvec, zvec]))
+                # find the 'center' of the image (average center lol)
+                ccd = (CACHE_COORDS[0][0] + CACHE_COORDS[3][0]) / 2, (CACHE_COORDS[0][1] + CACHE_COORDS[3][1]) / 2 # center of computer display
+                
+                # convert quat -> axis angle -> rodrigues angle -> 3x3 rot matrix -> 4x4 rot matrix
+                # rmat = np.ndarray([
+                #     [1 - 2 * yvec*yvec - 2 * zvec*zvec, 2 * xvec *yvec-2*zvec*wvec, 2*xvec*zvec+2*yvec*wvec],
+                #     [2*xvec*yvec+2*zvec*wvec, 1-2*xvec*xvec-2*zvec*zvec, 2*yvec*zvec-2*xvec*wvec],
+                #     [2*xvec*zvec-2*yvec*wvec, 2*yvec*zvec+2*xvec*wvec, 1-2*xvec*xvec-2*yvec*yvec]
+                # ])
+                mat1 = np.array([
+                    [wvec, zvec, -yvec, xvec],
+                    [-zvec, wvec, xvec, yvec],
+                    [yvec, -xvec, wvec, zvec],
+                    [-xvec, -yvec, -zvec, wvec]
+                ])
+                mat2 = np.array([
+                    [wvec, zvec, -yvec, -xvec],
+                    [-zvec, wvec, xvec, -yvec],
+                    [yvec, -xvec, wvec, -zvec],
+                    [xvec, yvec, zvec, wvec]
+                ])
+                rmat = np.matmul(mat1, mat2)
+                # print(rmat)
+
+                # now we do some math
+
 
                 # print(scale_factor)
             else:
                 # you are outside of the screen //  not focused ons creen
                 print("you are not focused on the window")
+                pass
+
+            # draw the rectnagle
+            # cv2.line(result, coords[0], coords[1], (0, 0, 255), 2) # top line
+            # cv2.line(result, coords[2], coords[3], (0, 0, 255), 2) # bot line
+            # cv2.line(result, coords[0], coords[2], (0, 0, 255), 2) # left line
+            # cv2.line(result, coords[1], coords[3], (0, 0, 255), 2) # right line
+            cv2.line(frame, CACHE_COORDS[0], CACHE_COORDS[1], (0, 0, 255), 2)
+            cv2.line(frame, CACHE_COORDS[2], CACHE_COORDS[3], (0, 0, 255), 2)
+            cv2.line(frame, CACHE_COORDS[0], CACHE_COORDS[2], (0, 0, 255), 2)
+            cv2.line(frame, CACHE_COORDS[1], CACHE_COORDS[3], (0, 0, 255), 2)
+            
 
             # show frame
             # cv2.imshow('frame', frame)
@@ -215,17 +263,20 @@ def main():
             # cv2.imshow('result', result)
             cv2.imshow('frame', frame)
 
-
             # wait for key press
             if cv2.waitKey(1) == ord('q'):
                 break
 
     except (KeyboardInterrupt, SystemExit) as e:
+        print(e)
         frontend.shutdown()
         cap.release()
         cv2.destroyAllWindows()
     except Exception as e:
         print(e)
+        frontend.shutdown()
+        cap.release()
+        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     wmain = get_monitors()[0]
