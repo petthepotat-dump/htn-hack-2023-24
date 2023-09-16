@@ -1,66 +1,76 @@
-import cv2
-import numpy as np
+import time
 import adhawkapi
 import adhawkapi.frontend
+import numpy as np
+import cv2
 
-class GazeTracker:
+frame = None  # Declare global frame to be accessed in multiple functions
+
+class FrontendData:
     def __init__(self):
-        # Initialize the Adhawk frontend
-        self.frontend = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-296')
-        self.frontend.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self.handle_et_data)
-        self.frontend.start(tracker_connect_cb=self.handle_tracker_connect)
+        self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-296')
+        self._api.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self._handle_et_data)
+        self._api.register_stream_handler(adhawkapi.PacketType.EVENTS, self._handle_events)
+        self._api.start(tracker_connect_cb=self._handle_tracker_connect,
+                        tracker_disconnect_cb=self._handle_tracker_disconnect)
 
-        # Define a transformation matrix (you need to populate this with calibration data)
-        self.transformation_matrix = np.identity(3)
+    def shutdown(self):
+        self._api.shutdown()
 
-    def handle_et_data(self, et_data: adhawkapi.EyeTrackingStreamData):
+    @staticmethod
+    def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
+        global frame  # Use the global frame variable
         if et_data.gaze is not None:
             xvec, yvec, zvec, vergence = et_data.gaze
+            print(f'Gaze={xvec:.2f},y={yvec:.2f},z={zvec:.2f},vergence={vergence:.2f}')
+            cv2.circle(frame, (int(xvec), int(yvec)), radius=10, color=(0, 0, 255), thickness=-1)
 
-            # Apply the transformation matrix to map gaze to camera view
-            gaze_camera_coords = np.dot(self.transformation_matrix, np.array([xvec, yvec, zvec]))
+    @staticmethod
+    def _handle_events(event_type, timestamp, *args):
+        if event_type == adhawkapi.Events.BLINK:
+            duration = args[0]
+            print(f'Got blink: {timestamp} {duration}')
 
-            # Draw a visual indicator (e.g., a red dot) at the gaze position on the camera frame
-            gaze_x, gaze_y = int(gaze_camera_coords[0]), int(gaze_camera_coords[1])
-            cv2.circle(self.frame, (gaze_x, gaze_y), 10, (0, 0, 255), -1)
-
-    def handle_tracker_connect(self):
+    def _handle_tracker_connect(self):
         print("Tracker connected")
-        self.frontend.set_et_stream_rate(60, callback=lambda *args: None)
-        self.frontend.set_et_stream_control([
+        self._api.set_et_stream_rate(60, callback=lambda *args: None)
+        self._api.set_et_stream_control([
             adhawkapi.EyeTrackingStreamTypes.GAZE,
+            adhawkapi.EyeTrackingStreamTypes.EYE_CENTER,
+            adhawkapi.EyeTrackingStreamTypes.PUPIL_DIAMETER,
+            adhawkapi.EyeTrackingStreamTypes.IMU_QUATERNION,
         ], True, callback=lambda *args: None)
+        self._api.set_event_control(adhawkapi.EventControlBit.BLINK, 1, callback=lambda *args: None)
+        self._api.set_event_control(adhawkapi.EventControlBit.EYE_CLOSE_OPEN, 1, callback=lambda *args: None)
 
-    # def calibrate(self):
-    #     # Implement your calibration process here
-    #     # This should involve having the user focus their gaze on specific points
-    #     # and recording the corresponding gaze vectors and camera positions for each point.
-    #     # Then, use this calibration data to compute the transformation matrix.
+    def _handle_tracker_disconnect(self):
+        print("Tracker disconnected")
 
-    def start_tracking(self):
-        cap = cv2.VideoCapture(0)
+def main():
+    global frame  # Declare global frame variable
+    frontend = FrontendData()
+    cap = cv2.VideoCapture(0)
 
-        if not cap.isOpened():
-            print("Cannot open camera")
-            return
+    if not cap.isOpened():
+        print("Cannot open camera")
+        exit()
 
-        try:
-            while True:
-                ret, self.frame = cap.read()
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
 
-                # Handle gaze data in the _handle_et_data method
+            cv2.imshow('frame', frame)
 
-                cv2.imshow('frame', self.frame)
-
-                if cv2.waitKey(1) == ord('q'):
-                    break
-
-        except (KeyboardInterrupt, SystemExit):
-            self.frontend.shutdown()
-            cap.release()
-            cv2.destroyAllWindows()
+            if cv2.waitKey(1) == ord('q'):
+                break
+                
+    except (KeyboardInterrupt, SystemExit):
+        frontend.shutdown()
+        cap.release()
+        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    gaze_tracker = GazeTracker()
-    gaze_tracker.calibrate()  # Perform calibration before starting tracking
-    gaze_tracker.start_tracking()
+    main()
