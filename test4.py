@@ -4,12 +4,12 @@ import adhawkapi.frontend
 import numpy as np
 import cv2
 
-frame = None  # Declare global frame to be accessed in multiple functions
-xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
+# Initialize gaze vector components to some default values
+xvec, yvec = 0.0, 0.0  
 
 class FrontendData:
     def __init__(self):
-        global xvec, yvec  # Declare these as global
+        global xvec, yvec  
         self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-296')
         self._api.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self._handle_et_data)
         self._api.register_stream_handler(adhawkapi.PacketType.EVENTS, self._handle_events)
@@ -21,7 +21,7 @@ class FrontendData:
 
     @staticmethod
     def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
-        global xvec, yvec  # Declare these as global
+        global xvec, yvec  
         if et_data.gaze is not None:
             xvec, yvec, zvec, vergence = et_data.gaze
             print(f'Gaze={xvec:.2f},y={yvec:.2f},z={zvec:.2f},vergence={vergence:.2f}')
@@ -49,42 +49,33 @@ class FrontendData:
         print("Tracker disconnected")
 
 def main():
-    ''' App entrypoint '''
-    global xvec, yvec  # Declare these as global
+    global xvec, yvec  
     frontend = FrontendData()
-    # create an opencv camera instance
+    
     cap = cv2.VideoCapture(0)
 
-    # check if camera is opened
     if not cap.isOpened():
         print("Cannot open camera")
         exit()
 
     try:
-        # run the opencv code
         while True:
-            # read frame from camera
             ret, frame = cap.read()
 
-            # check if frame is read correctly
             if not ret:
                 print("Can't receive frame (stream end?). Exiting ...")
                 break
-
-            # Get dimensions
+            
             h, w, c = frame.shape
+            
+            print(f'Updated Gaze x={xvec}, y={yvec}')  # Debug line to see if xvec, yvec are updated
 
-            # For demonstration: create a point from gaze vector
-            x_point = ((xvec + 0.07) /w-.5)
-            y_point = ((yvec) / h - .5)
+            x_point = int(w * (xvec + 1) / 2)
+            y_point = int(h * (yvec + 1) / 2)
 
-            # Draw a circle on the gaze point
             cv2.circle(frame, (x_point, y_point), 5, (0, 0, 255), -1)
-
-            # show frame
             cv2.imshow('frame', frame)
 
-            # wait for key press
             if cv2.waitKey(1) == ord('q'):
                 break
 
