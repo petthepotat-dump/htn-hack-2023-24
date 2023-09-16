@@ -13,7 +13,7 @@ import cv2
 # ----------------- me -----------------
 
 # Initialize Roboflow
-rf = Roboflow(api_key="rf_Oj9HVkEbmkSU4RA61RnOuxSPxAa2")
+rf = Roboflow(api_key="x")
 project = rf.workspace().project("screen-detector-v")
 model = project.version(1).model
 
@@ -121,7 +121,7 @@ def main():
         ret, frame = cap.read()
 
         if not ret:
-            break  # End of video
+            break
 
         # Predict on the current frame
         predictions = model.predict_from_image(frame, confidence=40, overlap=30)
@@ -134,16 +134,17 @@ def main():
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(frame, f"{label}: {confidence:.2f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Write the annotated frame to the output video
-        out.write(frame)
+        # Show the frame with bounding boxes
+        cv2.imshow('Object Detection', frame)
 
-    # Release the video capture and writer objects
+        # Check for user input to exit the loop
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            break
+
+    # Release the video capture object and close the OpenCV window
     cap.release()
-    out.release()
-
-    # Close any open windows
     cv2.destroyAllWindows()
-
 
     # try:
     #     # run the opencv code
