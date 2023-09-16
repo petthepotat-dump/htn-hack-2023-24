@@ -4,14 +4,14 @@ import pyautogui
 
 
 def is_closed_fist(hand_landmarks):
-    # Assume the landmarks have attributes x, y
     tip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x
     pip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].x
+    tip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y
+    pip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y
     
-    # Add more conditions
-    if tip_x < pip_x:
-        return False
-    return True
+    if tip_x < pip_x and tip_y > pip_y:
+        return True
+    return False
     
 def is_finger_extended(finger_tip, finger_dip, finger_mcp):
     return finger_tip.y < finger_dip.y and finger_dip.y < finger_mcp.y
@@ -151,6 +151,8 @@ while True:
                     hand_state[hand_type] = "closed_fist"
                     if hand_type == 'right':
                         pyautogui.mouseDown(button='left')
+                    elif hand_type == "left":
+                        pyautogui.click(button="right")
             
             else:
                 if hand_state[hand_type] != "unknown":
