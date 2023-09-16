@@ -75,8 +75,8 @@ def main():
             h, w, c = frame.shape
 
             # For demonstration: create a point from gaze vector
-            x_point = int((xvec + 1) * w / 2)
-            y_point = int((yvec + 1) * h / 2)
+            x_point = ((xvec + 0.07) /w-.5)
+            y_point = ((yvec) / h - .5)
 
             # Draw a circle on the gaze point
             cv2.circle(frame, (x_point, y_point), 5, (0, 0, 255), -1)
