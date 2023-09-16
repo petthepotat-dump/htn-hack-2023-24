@@ -13,7 +13,7 @@ import cv2
 # ----------------- me -----------------
 
 # Initialize Roboflow
-rf = Roboflow(api_key="x")
+rf = Roboflow(api_key="vWhscCBeLxNi4A38zyTf")
 project = rf.workspace().project("screen-detector-v")
 model = project.version(1).model
 
@@ -101,7 +101,6 @@ def main():
     frontend = FrontendData()
     # create an opencv camera instance
     cap = cv2.VideoCapture(0)
-
 
     # check if camera is opened
     if not cap.isOpened():

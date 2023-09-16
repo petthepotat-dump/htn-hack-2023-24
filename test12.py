@@ -63,12 +63,17 @@ def clamp(_min, _max, val):
     return 0 if val == NAN else val
 
 
+
+HSV_RANGE = [(110, 0, 0), (130, 100, 100)]
+C_LIMIT = 300
+
+
 def main():
     ''' App entrypoint '''
     global xvec, yvec  # Declare these as global
     frontend = FrontendData()
     # create an opencv camera instance
-    cap = cv2.VideoCapture(2)
+    cap = cv2.VideoCapture(0)
 
     # check if camera is opened
     if not cap.isOpened():
@@ -98,16 +103,22 @@ def main():
             # Draw a circle on the gaze point
             cv2.circle(frame, (x_point, y_point), 5, (0, 0, 255), -1)
 
+            # -- 
+            # get hsv image
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            # filter out colours within a range
+            mask = cv2.inRange(hsv, HSV_RANGE[0], HSV_RANGE[1])
+            result = cv2.bitwise_and(frame, frame, mask=mask)
+
+
             # show frame
-            cv2.imshow('frame', frame)
+            cv2.imshow('frame', result)
 
             # wait for key press
             if cv2.waitKey(1) == ord('q'):
                 break
 
     except (KeyboardInterrupt, SystemExit) as e:
-        print(e)
-        
         frontend.shutdown()
         cap.release()
         cv2.destroyAllWindows()
