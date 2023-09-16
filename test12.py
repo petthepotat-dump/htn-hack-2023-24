@@ -7,6 +7,13 @@ import cv2
 frame = None  # Declare global frame to be accessed in multiple functions
 xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
 
+
+
+# convert 15 inch to meters
+CSECTION = 15
+# 1 inch = 0.0254 meters
+COMPUTER_CSECTION = 0.0254 * CSECTION
+
 COUNTER = 0
 
 class FrontendData:
@@ -64,8 +71,9 @@ def clamp(_min, _max, val):
 
 
 
-HSV_RANGE = [(110, 0, 0), (130, 100, 100)]
-C_LIMIT = 300
+# HSV_RANGE = [np.array((60, 0, 0)), np.array((85, 100, 100))] # green
+HSV_RANGE = [np.array((135, 100, 200)), np.array((155, 160, 255))] # magenta
+C_LIMIT = 10
 
 
 def main():
@@ -109,10 +117,51 @@ def main():
             # filter out colours within a range
             mask = cv2.inRange(hsv, HSV_RANGE[0], HSV_RANGE[1])
             result = cv2.bitwise_and(frame, frame, mask=mask)
+            # convert result to black and white
+            resultbw = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
+
+            coords = []
+            # draw rectangles around each contour
+            contours, hierarchy = cv2.findContours(resultbw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for contour in contours:
+                x, y, w, h = cv2.boundingRect(contour)
+                if w*h > C_LIMIT:
+                    coords.append((x, y))
+                    cv2.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+
+
+            # sort coords by x, then by y
+            coords = sorted(coords, key=lambda x: (x[0]))
+            # draw coords to result (lines)
+            if len(coords) >= 4:
+                topleft = max(coords[:2], key=lambda x: x[1])
+                botleft = min(coords[:2], key=lambda x: x[1])
+                topright = max(coords[2:], key=lambda x: x[1])
+                botright = min(coords[2:], key=lambda x: x[1])
+                # print(topleft, botleft, topright, botright, coords)
+
+                # cv2.line(result, coords[0], coords[1], (0, 0, 255), 2) # top line
+                # cv2.line(result, coords[2], coords[3], (0, 0, 255), 2) # bot line
+                # cv2.line(result, coords[0], coords[2], (0, 0, 255), 2) # left line
+                # cv2.line(result, coords[1], coords[3], (0, 0, 255), 2) # right line
+                cv2.line(result, topleft, botleft, (0, 0, 255), 2)
+                cv2.line(result, topright, botright, (0, 0, 255), 2)
+                cv2.line(result, topleft, topright, (0, 0, 255), 2)
+                cv2.line(result, botleft, botright, (0, 0, 255), 2)
+                # diagonal line
+                cv2.line(result, botleft, topright, (0, 255, 0), 2)
+                d_length = np.sqrt((botleft[0] - topright[0])**2 + (botleft[1] - topright[1])**2) # pixels
+                scale_factor = COMPUTER_CSECTION / d_length # meters/pixels
+
+                print(scale_factor)
 
             # show frame
-            cv2.imshow('frame', result)
+            # cv2.imshow('frame', frame)
+            # cv2.imshow('hsv', hsv)
+            # cv2.imshow('mask', mask)
+            cv2.imshow('result', result)
 
             # wait for key press
             if cv2.waitKey(1) == ord('q'):

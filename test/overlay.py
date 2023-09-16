@@ -79,7 +79,7 @@ class SmallWindow(QWidget):
         self.setGeometry(x, y, w, h)  # x, y, width, height
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        self.setStyleSheet("background-color: rgba(0, 255, 0, 255);")
+        self.setStyleSheet("background-color: rgba(255, 0, 255, 255);")
 
     def keyPressEvent(self, event):
         # check if escape key
