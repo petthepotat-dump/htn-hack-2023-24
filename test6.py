@@ -48,19 +48,30 @@ def main():
 
         # Predict on the current frame
         response = model.predict(frame, confidence=40, overlap=30).json()
-        prediction_list = response['predictions']
+        prediction_list = response.get('predictions', [])
+        
+        # Filter out predictions that aren't labeled as 'screen'
+        screen_predictions = [pred for pred in prediction_list if pred['class'] == 'screens']
+        
+        if not screen_predictions:
+            cv2.imshow('Object Detection', frame)
+            continue
+        
+        # Sort predictions by area and take the largest one
+        largest_prediction = max(screen_predictions, key=lambda pred: pred['width'] * pred['height'])
+        
+        confidence = largest_prediction['confidence']
 
-        # Draw bounding boxes on the frame based on predictions
-        for prediction in prediction_list:
-            confidence = prediction['confidence']
-            x, y, w, h = int(prediction['x']), int(prediction['y']), int(prediction['width']), int(prediction['height'])
+        # Check if the confidence is above a certain threshold (e.g., 0.5 or 50% confidence)
+        if confidence > 0.5:
+            x, y, w, h = int(largest_prediction['x']), int(largest_prediction['y']), int(largest_prediction['width']), int(largest_prediction['height'])
             
             # Draw the bounding box on the frame
             pt1 = (int(x - w/2), int(y - h/2))
             pt2 = (int(x + w/2), int(y + h/2))
             frame = cv2.rectangle(frame, pt1, pt2, (255, 0, 0), 2)
 
-        # Show the frame with bounding boxes
+        # Show the frame with or without the bounding box
         cv2.imshow('Object Detection', frame)
 
         # Check for user input to exit the loop
