@@ -1,144 +1,118 @@
-from PySide2 import QtCore, QtGui, QtWidgets
+import time
 import adhawkapi
-import eye_tracker
-import math
-from PIL import Image
-import io
+import adhawkapi.frontend
+import numpy as np
+import cv2
 
-MARKER_SIZE = 20  # Diameter in pixels of the gaze marker
-MARKER_COLOR = (0, 250, 50)  # Colour of the gaze marker
-SCALE = 1.2
+frame = None  # Declare global frame to be accessed in multiple functions
+xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
 
-class Interface(QtWidgets.QWidget):
-    ''' Class for receiving and displaying the video stream '''
+COUNTER = 0
 
+class FrontendData:
     def __init__(self):
-        QtWidgets.QWidget.__init__(self)
-        self.setWindowTitle('LingoVision')
+        global xvec, yvec  # Declare these as global
+        self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-296')
+        self._api.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self._handle_et_data)
+        self._api.register_stream_handler(adhawkapi.PacketType.EVENTS, self._handle_events)
+        self._api.start(tracker_connect_cb=self._handle_tracker_connect,
+                        tracker_disconnect_cb=self._handle_tracker_disconnect)
 
-        vbox = QtWidgets.QVBoxLayout()
+    def shutdown(self):
+        self._api.shutdown()
 
-        self.text_label = QtWidgets.QLabel('Q: run a Quick Start,  C: run a Calibration, SPACE: Capture text')
-        self.text_label.setAlignment(QtCore.Qt.AlignCenter)
-        vbox.addWidget(self.text_label)
+    @staticmethod
+    def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
+        global COUNTER, xvec, yvec  # Declare these as global
+        COUNTER += 1
+        if COUNTER % 10 != 0: return
+        if et_data.gaze is not None:
+            xvec, yvec, zvec, vergence = et_data.gaze
+            # print(f'Gaze={xvec:.2f},y={yvec:.2f},z={zvec:.2f},vergence={vergence:.2f}')
 
-        title_hbox = QtWidgets.QHBoxLayout()
-        self.live_text_label = QtWidgets.QLabel('Live Feed:')
-        self.live_text_label.setAlignment(QtCore.Qt.AlignLeft)
-        title_hbox.addWidget(self.live_text_label)
-        self.full_frame_text_label = QtWidgets.QLabel('Captured Frame:')
-        self.full_frame_text_label.setAlignment(QtCore.Qt.AlignLeft)
-        title_hbox.addWidget(self.full_frame_text_label)
 
-        vbox.addLayout(title_hbox)
+    @staticmethod
+    def _handle_events(event_type, timestamp, *args):
+        if event_type == adhawkapi.Events.BLINK:
+            duration = args[0]
+            print(f'Got blink: {timestamp} {duration}')
 
-        stream_hbox = QtWidgets.QHBoxLayout()
+    def _handle_tracker_connect(self):
+        print("Tracker connected")
+        self._api.set_et_stream_rate(60, callback=lambda *args: None)
+        self._api.set_et_stream_control([
+            adhawkapi.EyeTrackingStreamTypes.GAZE,
+            adhawkapi.EyeTrackingStreamTypes.EYE_CENTER,
+            adhawkapi.EyeTrackingStreamTypes.PUPIL_DIAMETER,
+            adhawkapi.EyeTrackingStreamTypes.IMU_QUATERNION,
+        ], True, callback=lambda *args: None)
+        self._api.set_event_control(adhawkapi.EventControlBit.BLINK, 1, callback=lambda *args: None)
+        self._api.set_event_control(adhawkapi.EventControlBit.EYE_CLOSE_OPEN, 1, callback=lambda *args: None)
 
-        # Qt code to create a label that can hold an image. We will use this label to hold successive images from the
-        # video stream.
-        self.image_label = QtWidgets.QLabel(self)
-        stream_hbox.addWidget(self.image_label)
+    def _handle_tracker_disconnect(self):
+        print("Tracker disconnected")
 
-        # Full frame that we're analyzing
-        self.full_frame_label = QtWidgets.QLabel(self)
-        stream_hbox.addWidget(self.full_frame_label)
 
-        vbox.addLayout(stream_hbox)
+NAN = float('nan')
+def clamp(_min, _max, val):
+    global NAN
+    if val < _min:
+        return _min
+    if val > _max:
+        return _max
+    return 0 if val == NAN else val
 
-        self.setLayout(vbox)
 
-        # A Quick Start tunes the scan range and frequency to best suit the user's eye and face shape, resulting in
-        # better tracking data. For the best quality results in your application, you should also perform a calibration
-        # before using gaze data.
-        self.quickstart_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('q'), self)
-        self.quickstart_shortcut.activated.connect(self.quickstart)
+def main():
+    ''' App entrypoint '''
+    global xvec, yvec  # Declare these as global
+    frontend = FrontendData()
+    # create an opencv camera instance
+    cap = cv2.VideoCapture(0)
 
-        # A calibration allows us to relate the measured gaze with the real world using a series of markers displayed
-        # in known positions
-        self.calibration_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('c'), self)
-        self.calibration_shortcut.activated.connect(self.calibrate)
-
-        # Set this later
-        self.tracker = None
-
-    def set_capture_image(self, capture_image):
-        # Start capture image and start translation sequence
-        self.calibration_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence('space'), self)
-        self.calibration_shortcut.activated.connect(capture_image)
-
-    def set_current_frame(self, frame, coordinates):
-        # Create a new Qt pixmap and load the frame's data into it
-        qt_img = QtGui.QPixmap()
-        qt_img.loadFromData(self.downsize_jpg(frame), 'JPEG')
-
-        # Draws the gaze marker on the new frame
-        self._draw_gaze_marker(qt_img, coordinates)
-
-        # Sets the new image
-        self.full_frame_label.setPixmap(qt_img)
-
-    def closeEvent(self, event):
-        '''
-        Override of the window's close event. When the window closes, we want to ensure that we shut down the api
-        properly.
-        '''
-
-        self.tracker.shutdown()
+    # check if camera is opened
+    if not cap.isOpened():
+        print("Cannot open camera")
         exit()
-        super().closeEvent(event)
 
-    @property
-    def connected(self):
-        ''' Property to allow the main loop to check whether the api is connected to a tracker '''
-        return self.tracker.connected
+    try:
+        # run the opencv code
+        while True:
+            # read frame from camera
+            ret, frame = cap.read()
 
-    def quickstart(self):
-        ''' Function to allow the main loop to invoke a Quick Start '''
-        self.tracker.quickstart()
+            # check if frame is read correctly
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
 
-    def calibrate(self):
-        ''' Function to allow the main loop to invoke a Calibration '''
-        self.tracker.calibrate()
+            # Get dimensions
+            h, w, c = frame.shape
 
-    def downsize_jpg(self, jpg):
-        image = Image.open(io.BytesIO(jpg))
+            # For demonstration: create a point from gaze vector
+            xc = (clamp(-3, 3, xvec) + 3) / 6 * w
+            x_point = int(clamp(-10000, 10000, xc + (75 + xc/80)))
+            y_point = h - int((clamp(-2, 2, yvec) + 2) / 4 * h)
+            if COUNTER % 10 == 0: print(h, w, x_point, y_point)
 
-        width, height = image.size
+            # Draw a circle on the gaze point
+            cv2.circle(frame, (x_point, y_point), 5, (0, 0, 255), -1)
 
-        image = image.resize((int(width / SCALE), int(height / SCALE)))
+            # show frame
+            cv2.imshow('frame', frame)
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
+            # wait for key press
+            if cv2.waitKey(1) == ord('q'):
+                break
 
-        return img_byte_arr
+    except (KeyboardInterrupt, SystemExit) as e:
+        print(e)
+        
+        frontend.shutdown()
+        cap.release()
+        cv2.destroyAllWindows()
+    except Exception as e:
+        print(e)
 
-    def handle_video_stream(self, image_buf, coordinates):
-        # Create a new Qt pixmap and load the frame's data into it
-        qt_img = QtGui.QPixmap()
-        qt_img.loadFromData(self.downsize_jpg(image_buf), 'JPEG')
-
-        # Get the image's size. If self._frame_size has not yet been initialized, we set its values to the frame size.
-        size = qt_img.size().toTuple()
-        if size[0] != self.image_label.width() or size[1] != self.image_label.height():
-            # Set the image label's size to the frame's size
-            self.image_label.resize(size[0], size[1])
-
-        # Draws the gaze marker on the new frame
-        self._draw_gaze_marker(qt_img, coordinates)
-
-        # Sets the new image
-        self.image_label.setPixmap(qt_img)
-
-    def _draw_gaze_marker(self, qt_img, coordinates):
-        if math.isnan(coordinates[0]) or math.isnan(coordinates[1]):
-            return
-
-        # Draws the gaze marker on the given frame image
-        painter = QtGui.QPainter(qt_img)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setBrush(QtGui.QBrush(QtGui.QColor(*MARKER_COLOR), QtCore.Qt.SolidPattern))
-        painter.drawEllipse(QtCore.QRectF(int(coordinates[0] / SCALE) - MARKER_SIZE / 2,
-                                          int(coordinates[1] / SCALE) - MARKER_SIZE / 2,
-                                          MARKER_SIZE, MARKER_SIZE))
-        painter.end()
+if __name__ == '__main__':
+    main()
