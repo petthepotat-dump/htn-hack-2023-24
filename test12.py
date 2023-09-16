@@ -4,6 +4,7 @@ import adhawkapi.frontend
 import numpy as np
 import cv2
 import threading
+import math
 
 import sys
 from PyQt6.QtWidgets import QApplication, QWidget
@@ -44,7 +45,7 @@ xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default value
 
 
 # convert 15 inch to meters
-CSECTION = 15
+CSECTION = 14
 # 1 inch = 0.0254 meters
 COMPUTER_CSECTION = 0.0254 * CSECTION
 
@@ -94,14 +95,15 @@ class FrontendData:
         print("Tracker disconnected")
 
 
-NAN = float('nan')
 def clamp(_min, _max, val):
-    global NAN
     if val < _min:
         return _min
     if val > _max:
         return _max
-    return 0 if val == NAN else val
+    if math.isnan(val):
+        return 0
+    else:
+        return val
 
 
 
@@ -223,10 +225,4 @@ if __name__ == '__main__':
     window2.show()
     window3.show()
     window4.show()
-
-    thread = threading.Thread(target=app.exec)
-    thread.start()
     main()
-
-    thread.join()
-    
