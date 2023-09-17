@@ -5,30 +5,14 @@ import numpy as np
 import cv2
 import threading
 import math
-
 import sys
 from PyQt6.QtWidgets import QApplication, QWidget
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPainter, QBrush, QColor
 import pyautogui
-
-
-
-# get monitor res
 from screeninfo import get_monitors
 
-class SmoothedValue:
-    def __init__(self, alpha=0.5):
-        self.alpha = alpha
-        self.prev_value = None
-
-    def get(self, value):
-        if self.prev_value is None:
-            self.prev_value = value
-        smoothed_value = self.alpha * value + (1 - self.alpha) * self.prev_value
-        self.prev_value = smoothed_value
-        return smoothed_value
-
+# ... [Your SmallWindow class remains unchanged]
 class SmallWindow(QWidget):
     def __init__(self, title, x, y, w = 40, h = 40):
         super().__init__()
@@ -46,97 +30,53 @@ class SmallWindow(QWidget):
             QApplication.instance().quit()  # Close the application
 
 
+# Setting up Communication
+def on_connect():
+    print('Connected to AdHawk Backend Service')
 
-# --------------------------------------------------
+def on_disconnect():
+    print('Disconnected from AdHawk Backend Service')
 
+api = adhawkapi.frontend.FrontendApi()
+api.start(connect_cb=on_connect, disconnect_cb=on_disconnect)
 
+# Auto-Tune
+api.trigger_autotune()
 
-frame = None  # Declare global frame to be accessed in multiple functions
-xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
+# Calibration
+def grid_points(nrows, ncols, xrange=20, yrange=12.5, xoffset=0, yoffset=2.5):
+    '''Generates a grid of points based on range and number of rows/cols'''
+    zpos = -0.6  # typically 60cm to screen
+    xmin, xmax = np.tan(np.deg2rad([xoffset - xrange, xoffset + xrange])) * np.abs(zpos)
+    ymin, ymax = np.tan(np.deg2rad([yoffset - yrange, yoffset + yrange])) * np.abs(zpos)
 
+    cal_points = []
+    for ypos in np.linspace(ymin, ymax, nrows):
+        for xpos in np.linspace(xmin, xmax, ncols):
+            cal_points.append((xpos, ypos, zpos))
 
+    print(f'grid_points(): generated {nrows}x{ncols} points'
+          f' {xrange}x{yrange} deg box at {zpos}: {cal_points}')
 
-# convert 15 inch to meters
-CSECTION = 13
-# 1 inch = 0.0254 meters
-COMPUTER_CSECTION = 0.0254 * CSECTION
+    return cal_points
 
-COUNTER = 0
+npoints = 9
+nrows = int(np.sqrt(npoints))
+reference_points = grid_points(nrows, nrows)
 
-class FrontendData:
-    def __init__(self):
-        global xvec, yvec  # Declare these as global
-        self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-296')
-        self._api.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self._handle_et_data)
-        self._api.register_stream_handler(adhawkapi.PacketType.EVENTS, self._handle_events)
-        self._api.start(tracker_connect_cb=self._handle_tracker_connect,
-                        tracker_disconnect_cb=self._handle_tracker_disconnect)
+api.start_calibration()
+for point in reference_points:
+    api.register_calibration_point(*point)
+api.stop_calibration()
 
-    def shutdown(self):
-        self._api.shutdown()
+# Enable Data Streams
+def gaze_handler(*data):
+    timestamp, xpos, ypos, zpos, vergence = data
 
-    @staticmethod
-    def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
-        global COUNTER, xvec, yvec  # Declare these as global
-        COUNTER += 1
+api.register_stream_handler(adhawkapi.PacketType.EXTENDED_GAZE, gaze_handler)
+api.set_stream_control(adhawkapi.PacketType.EXTENDED_GAZE, 60)
 
-        if COUNTER % 10 != 0: return
-        if et_data.gaze is not None:
-            xvec, yvec, zvec, vergence = et_data.gaze
-            # print(f'Gaze={xvec:.2f},y={yvec:.2f},z={zvec:.2f},vergence={vergence:.2f}')
-
-
-    @staticmethod
-    def _handle_events(event_type, timestamp, *args):
-        if event_type == adhawkapi.Events.BLINK:
-            duration = args[0]
-            #print(f'Got blink: {timestamp} {duration}')
-
-    def _handle_tracker_connect(self):
-        print("Tracker connected")
-        self._api.set_et_stream_rate(60, callback=lambda *args: None)
-        self._api.set_et_stream_control([
-            adhawkapi.EyeTrackingStreamTypes.GAZE,
-            adhawkapi.EyeTrackingStreamTypes.EYE_CENTER,
-            adhawkapi.EyeTrackingStreamTypes.PUPIL_DIAMETER,
-            adhawkapi.EyeTrackingStreamTypes.IMU_QUATERNION,
-        ], True, callback=lambda *args: None)
-        self._api.set_event_control(adhawkapi.EventControlBit.BLINK, 1, callback=lambda *args: None)
-        self._api.set_event_control(adhawkapi.EventControlBit.EYE_CLOSE_OPEN, 1, callback=lambda *args: None)
-
-    def _handle_tracker_disconnect(self):
-        print("Tracker disconnected")
-
-
-
-
-def clamp(_min, _max, val):
-    if val < _min:
-        return _min
-    if val > _max:
-        return _max
-    if math.isnan(val):
-        return 0
-    else:
-        return val
-
-def transform_gaze_to_screen_space(gaze_point, src_points, dst_points):
-    src_points = np.array(src_points, dtype=np.float32)
-    dst_points = np.array(dst_points, dtype=np.float32)
-    
-    M = cv2.getPerspectiveTransform(src_points, dst_points)
-    
-    # Ensure gaze_point is a Nx1x2 array
-    gaze_points_array = np.array([gaze_point], dtype=np.float32).reshape(-1, 1, 2)
-    
-    transformed_points = cv2.perspectiveTransform(gaze_points_array, M)
-    return tuple(map(int, transformed_points[0][0]))
-
-
-# HSV_RANGE = [np.array((60, 0, 0)), np.array((85, 100, 100))] # green
-HSV_RANGE = [np.array((135, 100, 200)), np.array((155, 160, 255))] # magenta
-C_LIMIT = 10
-
+# ... [Rest of your code remains unchanged]
 
 def main():
     ''' App entrypoint '''
@@ -166,10 +106,8 @@ def main():
 
             # For demonstration: create a point from gaze vector
             xc = (clamp(-3, 3, xvec) + 3) / 6 * w
-            x_smoothed = SmoothedValue()
-            y_smoothed = SmoothedValue()
-            x_point = int(x_smoothed.get(xc + (75 + xc/80)))
-            y_point = h - int(y_smoothed.get((clamp(-2, 2, yvec) + 2) / 4 * h))
+            x_point = int(clamp(-10000, 10000, xc + (75 + xc/80)))
+            y_point = h - int((clamp(-2, 2, yvec) + 2) / 4 * h)
             #if COUNTER % 10 == 0: print(h, w, x_point, y_point)
 
             # -- 
