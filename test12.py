@@ -52,16 +52,25 @@ class SmallWindow(QWidget):
 
 
 frame = None  # Declare global frame to be accessed in multiple functions
-xvec, yvec = 0.0, 0.0  # Initialize gaze vector components to some default values
+xvec, yvec, zvec = 0.0, 0.0, 0.0  # Initialize gaze vector components to some default values
 
 
 
 # convert 15 inch to meters
-CSECTION = 13
+CSECTION = 15
+WIDTH = 13.4
+HEIGHT = 9.4
+
 # 1 inch = 0.0254 meters
 COMPUTER_CSECTION = 0.0254 * CSECTION
 
 COUNTER = 0
+
+# HSV_RANGE = [np.array((60, 0, 0)), np.array((85, 100, 100))] # green
+HSV_RANGE = [np.array((135, 100, 200)), np.array((155, 160, 255))] # magenta
+C_LIMIT = 15
+
+
 
 class FrontendData:
     def __init__(self):
@@ -79,7 +88,6 @@ class FrontendData:
     def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
         global COUNTER, xvec, yvec  # Declare these as global
         COUNTER += 1
-
         if COUNTER % 10 != 0: return
         if et_data.gaze is not None:
             xvec, yvec, zvec, vergence = et_data.gaze
@@ -106,9 +114,6 @@ class FrontendData:
 
     def _handle_tracker_disconnect(self):
         print("Tracker disconnected")
-
-
-
 
 def clamp(_min, _max, val):
     if val < _min:
@@ -160,18 +165,8 @@ def main():
             if not ret:
                 print("Can't receive frame (stream end?). Exiting ...")
                 break
-
             # Get dimensions
             h, w, c = frame.shape
-
-            # For demonstration: create a point from gaze vector
-            xc = (clamp(-3, 3, xvec) + 3) / 6 * w
-            x_smoothed = SmoothedValue()
-            y_smoothed = SmoothedValue()
-            x_point = int(x_smoothed.get(xc + (75 + xc/80)))
-            y_point = h - int(y_smoothed.get((clamp(-2, 2, yvec) + 2) / 4 * h))
-            #if COUNTER % 10 == 0: print(h, w, x_point, y_point)
-
             # -- 
             # get hsv image
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -191,8 +186,6 @@ def main():
                     coords.append((x, y))
                     cv2.rectangle(result, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-
-
             # sort coords by x, then by y
             coords = sorted(coords, key=lambda x: (x[0]))
             # draw coords to result (lines)
@@ -201,49 +194,38 @@ def main():
                 botleft = min(coords[:2], key=lambda x: x[1])
                 topright = max(coords[2:], key=lambda x: x[1])
                 botright = min(coords[2:], key=lambda x: x[1])
-                print(topleft, botleft, topright, botright, coords)
-
-                # cv2.line(result, coords[0], coords[1], (0, 0, 255), 2) # top line
-                # cv2.line(result, coords[2], coords[3], (0, 0, 255), 2) # bot line
-                # cv2.line(result, coords[0], coords[2], (0, 0, 255), 2) # left line
-                # cv2.line(result, coords[1], coords[3], (0, 0, 255), 2) # right line
+                # print(topleft, botleft, topright, botright, coords)
                 cv2.line(frame, topleft, botleft, (0, 0, 255), 2)
                 cv2.line(frame, topright, botright, (0, 0, 255), 2)
                 cv2.line(frame, topleft, topright, (0, 0, 255), 2)
                 cv2.line(frame, botleft, botright, (0, 0, 255), 2)
                 #---------
-            
-                # krish stuff -- keep commented for now
-                # cv2.line(frame, topleft, botleft, (0, 0, 255), 2)
-                # cv2.line(frame, topright, botright, (0, 0, 255), 2)
-                # cv2.line(frame, topleft, topright, (0, 0, 255), 2)
-                # cv2.line(frame, botleft, botright, (0, 0, 255), 2)
-                # cv2.line(frame, botleft, topright, (0, 255, 0), 2)
+                # Draw a circle on the gaze poin
+                wm = get_monitors()[0]
 
-                cv2.circle(frame, (x_point, y_point), 5, (255, 255, 255), -1)
+                # print(xvec, yvec, zvec)
+                if math.isnan(xvec): xvec = 0
+                if math.isnan(yvec): yvec = 0
 
-                # diagonal line
-                cv2.line(result, botleft, topright, (0, 255, 0), 2)
-                d_length = np.sqrt((botleft[0] - topright[0])**2 + (botleft[1] - topright[1])**2) # pixels
-                scale_factor = COMPUTER_CSECTION / d_length # meters/pixels
+                rx = int(xvec/3 * wm.width / 2) + 1920//2
+                ry = 1080//2 - int(yvec/1.8 * wm.height)
 
-                src_points = [topleft, botleft, topright, botright]
-                dst_points = [(0, 0), (0, wmain.height), (wmain.width, 0), (wmain.width, wmain.height)]
 
-                transformed_gaze_point = transform_gaze_to_screen_space((x_point, y_point), src_points, dst_points)
-            
-                # Draw a circle on the gaze point
-                cv2.circle(frame, transformed_gaze_point, 5, (255, 255, 255), -1)
+                # what is width of the moinitor?
+                mw = topright[0] - botleft[0]
+                mh = botright[1] - topleft[1]
 
-                # print(scale_factor)
+                # assume max left = -2.5, max right = 2.5
+                # max bot = -1.8, max top = 1.8
+                # then remap inputs relative to scale
+                sx, sy = (xvec+2.5)/5, (yvec+1.8)/3.6
+                # finding the final coords
+                ex, ey = int(sx * mw + topleft[0]), int(sy * mh + topleft[1])
+                print(ex, ey)
+
+                cv2.circle(frame, (ex, ey), 5, (0, 255, 0), -1)
             else:
-                # you are outside of the screen //  not focused ons creen
-                print("you are not focused on the window")
-
-            # show frame
-            # cv2.imshow('hsv', hsv)
-            # cv2.imshow('mask', mask)
-            # cv2.imshow('result', result)
+                pass
 
             # cv2.imshow('result', result)
             cv2.imshow('frame', frame)
