@@ -2,64 +2,11 @@ import cv2
 import mediapipe as mp
 import pyautogui
 import time
-import adhawkapi
-import adhawkapi.frontend
 
 # Global variables
 hand_state = {'left': 'unknown', 'right': 'unknown'}
 eye_state = {'left': 'open', 'right': 'open'}
-last_double_blink_time = 0  # Initialize variable to keep track of the last time a double blink was detected
 
-class FrontendData:
-    def __init__(self):
-        self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-257')
-        self._api.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self._handle_et_data)
-        self._api.register_stream_handler(adhawkapi.PacketType.EVENTS, self._handle_events)
-        self._api.start(tracker_connect_cb=self._handle_tracker_connect, tracker_disconnect_cb=self._handle_tracker_disconnect)
-
-    def shutdown(self):
-        self._api.shutdown()
-
-    @staticmethod
-    def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
-        pass  # We are not using eye tracking data for now
-
-    @staticmethod
-    def _handle_events(event_type, timestamp, *args):
-        global last_double_blink_time
-        if event_type == adhawkapi.Events.BLINK:
-            duration = args[0]
-            current_time = time.time()
-            if current_time - last_double_blink_time < 1:
-                pyautogui.press('enter')
-            last_double_blink_time = current_time
-
-        if event_type == adhawkapi.Events.EYE_CLOSED:
-            eye_idx = args[0]
-            eye = 'left' if eye_idx == 0 else 'right'
-            eye_state[eye] = 'closed'
-
-        if event_type == adhawkapi.Events.EYE_OPENED:
-            eye_idx = args[0]
-            eye = 'left' if eye_idx == 0 else 'right'
-            eye_state[eye] = 'open'
-
-    def _handle_tracker_connect(self):
-        self._api.set_et_stream_rate(60, callback=lambda *args: None)
-        self._api.set_et_stream_control([
-            adhawkapi.EyeTrackingStreamTypes.GAZE,
-            adhawkapi.EyeTrackingStreamTypes.EYE_CENTER,
-            adhawkapi.EyeTrackingStreamTypes.PUPIL_DIAMETER,
-            adhawkapi.EyeTrackingStreamTypes.IMU_QUATERNION,
-        ], True, callback=lambda *args: None)
-        self._api.set_event_control(adhawkapi.EventControlBit.BLINK, 1, callback=lambda *args: None)
-        self._api.set_event_control(adhawkapi.EventControlBit.EYE_CLOSE_OPEN, 1, callback=lambda *args: None)
-
-    def _handle_tracker_disconnect(self):
-        pass
-
-# Initialize AdHawk
-adhawk_frontend = FrontendData()
 
 def is_finger_extended(finger_tip, finger_dip, finger_mcp):
     return finger_tip.y < finger_dip.y and finger_dip.y < finger_mcp.y
