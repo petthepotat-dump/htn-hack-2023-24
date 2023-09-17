@@ -8,11 +8,12 @@ import adhawkapi.frontend
 # Global variables
 hand_state = {'left': 'unknown', 'right': 'unknown'}
 eye_state = {'left': 'open', 'right': 'open'}
-last_double_blink_time = 0  # Initialize variable to keep track of the last time a double blink was detected
+last_double_blink_time = 0
 
+# Initialize AdHawk
 class FrontendData:
     def __init__(self):
-        self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-257')
+        self._api = adhawkapi.frontend.FrontendApi(ble_device_name='ADHAWK MINDLINK-296')
         self._api.register_stream_handler(adhawkapi.PacketType.EYETRACKING_STREAM, self._handle_et_data)
         self._api.register_stream_handler(adhawkapi.PacketType.EVENTS, self._handle_events)
         self._api.start(tracker_connect_cb=self._handle_tracker_connect, tracker_disconnect_cb=self._handle_tracker_disconnect)
@@ -22,7 +23,7 @@ class FrontendData:
 
     @staticmethod
     def _handle_et_data(et_data: adhawkapi.EyeTrackingStreamData):
-        pass  # We are not using eye tracking data for now
+        pass
 
     @staticmethod
     def _handle_events(event_type, timestamp, *args):
@@ -30,7 +31,7 @@ class FrontendData:
         if event_type == adhawkapi.Events.BLINK:
             duration = args[0]
             current_time = time.time()
-            if current_time - last_double_blink_time < 1:
+            if current_time - last_double_blink_time < 0.5:
                 pyautogui.press('enter')
             last_double_blink_time = current_time
 
@@ -58,9 +59,12 @@ class FrontendData:
     def _handle_tracker_disconnect(self):
         pass
 
-# Initialize AdHawk
 adhawk_frontend = FrontendData()
 
+# Initialize MediaPipe Hands module
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands()
+mp_drawing = mp.solutions.drawing_utils
 def is_finger_extended(finger_tip, finger_dip, finger_mcp):
     return finger_tip.y < finger_dip.y and finger_dip.y < finger_mcp.y
 
@@ -91,10 +95,6 @@ def is_two_finger_scroll(hand_landmarks):
         return True
     return False
 
-# Initialize MediaPipe Hands module
-mp_hands = mp.solutions.hands
-hands = mp_hands.Hands()
-mp_drawing = mp.solutions.drawing_utils
 
 def websurfing_controller(frame, active_mode):
     if active_mode != 'web':
@@ -122,6 +122,25 @@ def websurfing_controller(frame, active_mode):
 
     # Check for winks and perform mouse clicks
     if eye_state['left'] == 'closed' and eye_state['right'] == 'open':
-        pyautogui.click(button='left')
+        pyautogui.click(button='right')  # Right-click if only the right eye is winked
     elif eye_state['right'] == 'closed' and eye_state['left'] == 'open':
-        pyautogui.click(button='right')
+        pyautogui.click(button='left')   # Left-click if only the left eye is winked
+
+# Main Loop (Assuming you have a camera setup)
+cap = cv2.VideoCapture(0)
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame")
+        break
+
+    websurfing_controller(frame, 'web')
+    cv2.imshow('MediaPipe Hands', frame)
+
+    if cv2.waitKey(5) & 0xFF == 27:
+        break
+
+cv2.destroyAllWindows()
+cap.release()
+adhawk_frontend.shutdown()
