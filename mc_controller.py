@@ -14,7 +14,7 @@ def is_pointFront(hand_landmarks):
     tip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y
     pip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP].y
     
-    if tip_x == pip_x and tip_y == pip_y:
+    if tip_x < pip_x and tip_y > pip_y:
         return True
     return False
 
@@ -24,7 +24,7 @@ def is_pointRight(hand_landmarks):
     tip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y
     pip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP].y
     
-    if tip_x < pip_x and tip_y > pip_y:
+    if tip_x > pip_x and tip_y > pip_y:
         return True
     return False
 
