@@ -9,24 +9,32 @@ mp_drawing = mp.solutions.drawing_utils
 
 hand_state = {'left': 'unknown', 'right': 'unknown'}
 def is_pointFront(hand_landmarks):
-    tip_x = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].x
-    pip_x = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP].x
-    tip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y
-    pip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP].y
+    tip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x
+    pip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].x
+    tip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y
+    pip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y
     
-    if tip_x < pip_x and tip_y > pip_y:
-        return True
-    return False
+    #return tip_y < pip_y # True if the fingertip is above the PIP joint
+    return abs(tip_y - pip_y) > abs(tip_x - pip_x) and tip_y < pip_y
+
 
 def is_pointRight(hand_landmarks):
-    tip_x = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].x
-    pip_x = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP].x
-    tip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y
-    pip_y = hand_landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP].y
+    tip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x
+    pip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].x
+    tip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y
+    pip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y
     
-    if tip_x > pip_x and tip_y > pip_y:
-        return True
-    return False
+    #return tip_x > pip_x  # True if the fingertip is to the right of the PIP joint
+    return abs(tip_x - pip_x) > abs(tip_y - pip_y) and tip_x > pip_x
+
+def is_pointLeft(hand_landmarks):
+    tip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x
+    pip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].x
+    tip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y
+    pip_y = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y
+    
+    # Check if the horizontal difference is greater than the vertical difference
+    return abs(tip_x - pip_x) > abs(tip_y - pip_y) and tip_x < pip_x
 
 def is_closed_fist(hand_landmarks):
     tip_x = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x
@@ -82,18 +90,28 @@ def minecraft_controller(frame, active_mode):
                     print(f"{hand_type.capitalize()} Hand: Pointed Front")
                     hand_state[hand_type] = "point_front"
                     if hand_type == 'right':
-                        pyautogui.mouseDown(button='left')
+                        print("right - point_front")
                     elif hand_type == "left":
-                        pyautogui.click(button='right')
+                        print("left - point_front")
+
             
             elif is_pointRight(hand_landmarks):
                 if hand_state[hand_type] != "point_right":
-                    print(f"{hand_type.capitalize()} Hand: Pointed Front")
+                    print(f"{hand_type.capitalize()} Hand: Pointed Right")
                     hand_state[hand_type] = "point_right"
                     if hand_type == 'right':
-                        pyautogui.mouseDown(button='left')
+                        print("right - point_right")
                     elif hand_type == "left":
-                        pyautogui.click(button='right')
+                        print("left - point_right")
+            
+            elif is_pointLeft(hand_landmarks):
+                if hand_state[hand_type] != "point_left":
+                    print(f"{hand_type.capitalize()} Hand: Pointed Left")
+                    hand_state[hand_type] = "point_left"
+                    if hand_type == 'right':
+                        print("right - point_left")
+                    elif hand_type == "left":
+                        print("left - point_left")
             
             elif is_closed_fist(hand_landmarks):
                 if hand_state[hand_type] != "closed_fist":

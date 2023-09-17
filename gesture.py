@@ -3,7 +3,7 @@ from mc_controller import minecraft_controller
 from websurfing_controller import websurfing_controller
 import keyboard
 
-active_mode = 'web'  # default to web mode
+active_mode = 'minecraft'  # default to web mode
 
 def toggle_mode(e):
     global active_mode
@@ -14,7 +14,7 @@ def toggle_mode(e):
         print("Switching to Web Surfing Mode")
         active_mode = 'web'
 
-keyboard.on_press_key("f6", toggle_mode)
+keyboard.on_press_key("f4", toggle_mode)
 
 cap = cv2.VideoCapture(0)
 
